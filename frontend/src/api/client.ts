@@ -1,12 +1,36 @@
 import type { Job, ClipDetail, StorageStats } from '../types';
 
-// In production (Vercel), VITE_API_BASE_URL points to your live Docker backend or tunnel URL.
-// Example: https://api.yourdomain.com or https://xxxx.trycloudflare.com
-// In local dev without env var, empty string falls back to relative /api for proxying.
-const rawBackend = ((import.meta.env.VITE_API_BASE_URL as string) || '').trim().replace(/\/+$/, '');
-const API_BASE = rawBackend
-  ? (rawBackend.endsWith('/api') ? rawBackend : `${rawBackend}/api`)
-  : '/api';
+export const BACKEND_URL_KEY = 'clipforge_backend_url';
+
+export function getStoredBackendUrl(): string {
+  if (typeof window !== 'undefined') {
+    const stored = localStorage.getItem(BACKEND_URL_KEY);
+    if (stored && stored.trim()) {
+      return stored.trim().replace(/\/+$/, '');
+    }
+  }
+  const envUrl = ((import.meta.env.VITE_API_BASE_URL as string) || '').trim().replace(/\/+$/, '');
+  return envUrl;
+}
+
+export function setStoredBackendUrl(url: string): void {
+  if (typeof window !== 'undefined') {
+    const clean = url.trim().replace(/\/+$/, '');
+    if (!clean) {
+      localStorage.removeItem(BACKEND_URL_KEY);
+    } else {
+      localStorage.setItem(BACKEND_URL_KEY, clean);
+    }
+  }
+}
+
+export function getApiBase(): string {
+  const raw = getStoredBackendUrl();
+  if (!raw) {
+    return '/api';
+  }
+  return raw.endsWith('/api') ? raw : `${raw}/api`;
+}
 
 async function handleResponse<T>(res: Response): Promise<T> {
   if (!res.ok) {
@@ -17,7 +41,7 @@ async function handleResponse<T>(res: Response): Promise<T> {
         errorDetail = typeof data.detail === 'string' ? data.detail : JSON.stringify(data.detail);
       }
     } catch {
-      // Use fallback errorDetail
+      // Fallback
     }
     throw new Error(errorDetail);
   }
@@ -28,18 +52,22 @@ async function handleResponse<T>(res: Response): Promise<T> {
 }
 
 export const api = {
+  getApiBase,
+  getStoredBackendUrl,
+  setStoredBackendUrl,
+
   async getHealth(): Promise<{ status: string; service: string }> {
-    const res = await fetch(`${API_BASE}/health`);
+    const res = await fetch(`${getApiBase()}/health`);
     return handleResponse(res);
   },
 
   async getStorageStats(): Promise<StorageStats> {
-    const res = await fetch(`${API_BASE}/storage`);
+    const res = await fetch(`${getApiBase()}/storage`);
     return handleResponse<StorageStats>(res);
   },
 
   async createJob(formData: FormData): Promise<Job> {
-    const res = await fetch(`${API_BASE}/jobs`, {
+    const res = await fetch(`${getApiBase()}/jobs`, {
       method: 'POST',
       body: formData,
     });
@@ -47,32 +75,32 @@ export const api = {
   },
 
   async getJobs(status?: string): Promise<Job[]> {
-    const url = status ? `${API_BASE}/jobs?status=${encodeURIComponent(status)}` : `${API_BASE}/jobs`;
+    const url = status ? `${getApiBase()}/jobs?status=${encodeURIComponent(status)}` : `${getApiBase()}/jobs`;
     const res = await fetch(url);
     return handleResponse<Job[]>(res);
   },
 
   async getJob(jobId: string): Promise<Job> {
-    const res = await fetch(`${API_BASE}/jobs/${encodeURIComponent(jobId)}`);
+    const res = await fetch(`${getApiBase()}/jobs/${encodeURIComponent(jobId)}`);
     return handleResponse<Job>(res);
   },
 
   async retryJob(jobId: string): Promise<Job> {
-    const res = await fetch(`${API_BASE}/jobs/${encodeURIComponent(jobId)}/retry`, {
+    const res = await fetch(`${getApiBase()}/jobs/${encodeURIComponent(jobId)}/retry`, {
       method: 'POST',
     });
     return handleResponse<Job>(res);
   },
 
   async cancelJob(jobId: string): Promise<Job> {
-    const res = await fetch(`${API_BASE}/jobs/${encodeURIComponent(jobId)}/cancel`, {
+    const res = await fetch(`${getApiBase()}/jobs/${encodeURIComponent(jobId)}/cancel`, {
       method: 'POST',
     });
     return handleResponse<Job>(res);
   },
 
   async deleteJob(jobId: string): Promise<void> {
-    const res = await fetch(`${API_BASE}/jobs/${encodeURIComponent(jobId)}`, {
+    const res = await fetch(`${getApiBase()}/jobs/${encodeURIComponent(jobId)}`, {
       method: 'DELETE',
     });
     return handleResponse<void>(res);
@@ -82,18 +110,18 @@ export const api = {
     const params = new URLSearchParams();
     if (jobId) params.append('job_id', jobId);
     if (status) params.append('status', status);
-    const url = `${API_BASE}/clips?${params.toString()}`;
+    const url = `${getApiBase()}/clips?${params.toString()}`;
     const res = await fetch(url);
     return handleResponse<ClipDetail[]>(res);
   },
 
   async getClip(clipId: string): Promise<ClipDetail> {
-    const res = await fetch(`${API_BASE}/clips/${encodeURIComponent(clipId)}`);
+    const res = await fetch(`${getApiBase()}/clips/${encodeURIComponent(clipId)}`);
     return handleResponse<ClipDetail>(res);
   },
 
   async updateClip(clipId: string, updates: { title?: string; start_time?: number; end_time?: number; aspect_ratio?: string }): Promise<ClipDetail> {
-    const res = await fetch(`${API_BASE}/clips/${encodeURIComponent(clipId)}`, {
+    const res = await fetch(`${getApiBase()}/clips/${encodeURIComponent(clipId)}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(updates),
@@ -102,7 +130,7 @@ export const api = {
   },
 
   async deleteClip(clipId: string): Promise<void> {
-    const res = await fetch(`${API_BASE}/clips/${encodeURIComponent(clipId)}`, {
+    const res = await fetch(`${getApiBase()}/clips/${encodeURIComponent(clipId)}`, {
       method: 'DELETE',
     });
     return handleResponse<void>(res);

@@ -1,11 +1,13 @@
 import React, { useEffect, useState } from 'react';
-import { RefreshCw, Folder } from 'lucide-react';
+import { RefreshCw, Folder, Globe, CheckCircle2 } from 'lucide-react';
 import { api } from '../api/client';
 import type { StorageStats } from '../types';
 
 export const StorageSettings: React.FC = () => {
   const [stats, setStats] = useState<StorageStats | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [backendUrl, setBackendUrl] = useState<string>(() => api.getStoredBackendUrl());
+  const [saveSuccess, setSaveSuccess] = useState(false);
 
   const fetchStats = async () => {
     try {
@@ -15,6 +17,19 @@ export const StorageSettings: React.FC = () => {
     } catch (err: any) {
       setError(err.message || 'Failed to load storage details.');
     }
+  };
+
+  const handleSaveBackend = async () => {
+    api.setStoredBackendUrl(backendUrl);
+    setSaveSuccess(true);
+    setTimeout(() => setSaveSuccess(false), 3000);
+    fetchStats();
+  };
+
+  const handleResetBackend = async () => {
+    api.setStoredBackendUrl('');
+    setBackendUrl('');
+    fetchStats();
   };
 
   useEffect(() => {
@@ -27,7 +42,7 @@ export const StorageSettings: React.FC = () => {
         <div>
           <h1>Storage & System Settings</h1>
           <p style={{ marginTop: '0.25rem' }}>
-            Local Windows folder persistence, CPU worker allocation, and model configuration.
+            Local Windows folder persistence, live backend connection, and model configuration.
           </p>
         </div>
         <button onClick={fetchStats} className="btn btn-secondary">
@@ -41,6 +56,65 @@ export const StorageSettings: React.FC = () => {
           {error}
         </div>
       )}
+
+      {/* Backend API Connection */}
+      <div className="card">
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+          <Globe size={18} />
+          <h2>Backend API Connection</h2>
+        </div>
+        <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: '1rem' }}>
+          Configure the live API endpoint for this Vercel deployment. Connect to your Docker backend via Cloudflare Tunnel or your VPS.
+        </p>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+          <div>
+            <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '0.35rem' }}>
+              Active Endpoint
+            </label>
+            <code style={{ display: 'block', padding: '0.5rem 0.75rem', backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-sm)', fontSize: '0.85rem' }}>
+              {api.getApiBase()}
+            </code>
+          </div>
+
+          <div>
+            <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '0.35rem' }}>
+              Custom Backend URL (e.g., https://xxxx.trycloudflare.com or https://api.yourdomain.com)
+            </label>
+            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+              <input
+                type="text"
+                value={backendUrl}
+                onChange={(e) => setBackendUrl(e.target.value)}
+                placeholder="https://xxxx.trycloudflare.com"
+                style={{
+                  flex: 1,
+                  minWidth: '260px',
+                  padding: '0.5rem 0.75rem',
+                  borderRadius: 'var(--radius-sm)',
+                  border: '1px solid var(--border-color)',
+                  fontSize: '0.875rem',
+                  backgroundColor: 'var(--bg-primary)',
+                  color: 'var(--text-primary)'
+                }}
+              />
+              <button onClick={handleSaveBackend} className="btn btn-primary">
+                Save & Connect
+              </button>
+              {backendUrl && (
+                <button onClick={handleResetBackend} className="btn btn-secondary">
+                  Reset
+                </button>
+              )}
+            </div>
+            {saveSuccess && (
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', color: 'var(--status-success)', fontSize: '0.8rem', marginTop: '0.35rem' }}>
+                <CheckCircle2 size={14} /> Backend URL saved! Reconnecting...
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
 
       {/* Windows Folder Access Instructions */}
       <div className="card" style={{ backgroundColor: 'var(--bg-secondary)' }}>

@@ -15,6 +15,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
   const [storage, setStorage] = useState<StorageStats | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
+  const [backendUrlInput, setBackendUrlInput] = useState<string>(() => api.getStoredBackendUrl());
 
   const fetchData = async () => {
     try {
@@ -28,6 +29,11 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
     } catch (err: any) {
       setError(err.message || 'Failed to connect to backend service.');
     }
+  };
+
+  const handleSaveBackendUrl = async () => {
+    api.setStoredBackendUrl(backendUrlInput);
+    await fetchData();
   };
 
   useEffect(() => {
@@ -90,9 +96,39 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
       </div>
 
       {error && (
-        <div className="card" style={{ backgroundColor: 'var(--status-danger-bg)', borderColor: '#fecaca', display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--status-danger)' }}>
-          <AlertCircle size={18} />
-          <span>{error}</span>
+        <div className="card" style={{ backgroundColor: 'var(--status-danger-bg)', borderColor: '#fecaca', display: 'flex', flexDirection: 'column', gap: '0.75rem', color: 'var(--status-danger)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 600 }}>
+            <AlertCircle size={18} />
+            <span>Backend Connection Error: {error}</span>
+          </div>
+          <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: 0 }}>
+            The frontend is calling <code>{api.getApiBase()}</code>. To connect this Vercel deployment to your Docker backend, enter your live HTTPS URL below (e.g. from Cloudflare Tunnel or your VPS):
+          </p>
+          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+            <input
+              type="text"
+              value={backendUrlInput}
+              onChange={(e) => setBackendUrlInput(e.target.value)}
+              placeholder="https://xxxx.trycloudflare.com or https://api.yourdomain.com"
+              style={{
+                flex: 1,
+                minWidth: '280px',
+                padding: '0.5rem 0.75rem',
+                borderRadius: 'var(--radius-sm)',
+                border: '1px solid var(--border-color)',
+                fontSize: '0.875rem',
+                color: 'var(--text-primary)',
+                backgroundColor: 'var(--bg-primary)'
+              }}
+            />
+            <button
+              onClick={handleSaveBackendUrl}
+              className="btn btn-primary"
+              style={{ padding: '0.5rem 1rem' }}
+            >
+              Connect & Test
+            </button>
+          </div>
         </div>
       )}
 
