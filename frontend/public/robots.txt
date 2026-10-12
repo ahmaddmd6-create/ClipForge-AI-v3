@@ -1,0 +1,18 @@
+# robots.txt for AX101 Studio
+# ─────────────────────────────────────────────────────────────────────────────
+# OWNER ACTION REQUIRED:
+# 1. Replace [YOUR_DOMAIN] with your actual domain (e.g. https://ax101.example.com)
+# 2. Change "Disallow: /" to "Allow: /" once you want search engines to index the site.
+#    Currently set to disallow all crawling because this is a demo / internal tool.
+# ─────────────────────────────────────────────────────────────────────────────
+
+User-agent: *
+# Uncomment the following two lines to allow indexing:
+# Allow: /
+# Disallow: /api/
+
+# Currently blocking all crawlers (demo/internal tool):
+Disallow: /
+
+# Sitemap location — update domain when deployed:
+# Sitemap: https://[YOUR_DOMAIN]/sitemap.xml

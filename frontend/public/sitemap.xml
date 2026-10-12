@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  sitemap.xml for AX101 Studio
+  ─────────────────────────────────────────────────────────────────────────────
+  OWNER ACTION REQUIRED:
+  Replace [YOUR_DOMAIN] with your actual deployed domain before submitting
+  to Google Search Console or any other search engine.
+  Also update <lastmod> dates when content changes.
+  ─────────────────────────────────────────────────────────────────────────────
+-->
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>https://[YOUR_DOMAIN]/</loc>
+    <lastmod>2026-10-11</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>1.0</priority>
+  </url>
+  <url>
+    <loc>https://[YOUR_DOMAIN]/privacy-policy</loc>
+    <lastmod>2026-10-11</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://[YOUR_DOMAIN]/terms-and-conditions</loc>
+    <lastmod>2026-10-11</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://[YOUR_DOMAIN]/cookie-policy</loc>
+    <lastmod>2026-10-11</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.4</priority>
+  </url>
+  <url>
+    <loc>https://[YOUR_DOMAIN]/refund-policy</loc>
+    <lastmod>2026-10-11</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.4</priority>
+  </url>
+</urlset>

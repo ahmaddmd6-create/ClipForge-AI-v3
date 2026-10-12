@@ -1,0 +1,108 @@
+services:
+  # ─────────────────────────────────────────────────────────────────
+  # ClipForge AI – FastAPI Backend Web Service
+  # ─────────────────────────────────────────────────────────────────
+  - type: web
+    name: clipforge-api
+    runtime: python
+    region: oregon
+    plan: standard
+    rootDir: .
+    buildCommand: |
+      apt-get update && apt-get install -y ffmpeg &&
+      pip install -r backend/requirements.txt
+    startCommand: uvicorn backend.app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/health
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: LOG_LEVEL
+        value: INFO
+      - key: DATABASE_URL
+        fromDatabase:
+          name: clipforge-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: clipforge-redis
+          property: connectionString
+      - key: STORAGE_ROOT
+        value: /var/data/storage
+      - key: WHISPER_MODEL
+        value: base
+      - key: WHISPER_COMPUTE_TYPE
+        value: int8
+      - key: CPU_THREADS
+        value: "4"
+      - key: MAX_CONCURRENT_JOBS
+        value: "1"
+      - key: MAX_PARALLEL_RENDERS
+        value: "1"
+      # CORS: add your Vercel domain below after deploying frontend
+      - key: CORS_ALLOWED_ORIGINS
+        value: https://clip-forge-ai-eight.vercel.app,https://clipforge-ai.vercel.app,http://localhost:8080,http://localhost:5173
+      # Optional: set these in Render dashboard (keep secret)
+      # - key: APP_SECRET_KEY
+      #   value: your-strong-secret-key-here
+    disk:
+      name: clipforge-storage
+      mountPath: /var/data/storage
+      sizeGB: 50
+
+  # ─────────────────────────────────────────────────────────────────
+  # ClipForge AI – Background Video Processing Worker
+  # ─────────────────────────────────────────────────────────────────
+  - type: worker
+    name: clipforge-worker
+    runtime: python
+    region: oregon
+    plan: standard
+    rootDir: .
+    buildCommand: |
+      apt-get update && apt-get install -y ffmpeg &&
+      pip install -r backend/requirements.txt
+    startCommand: python -m backend.app.worker
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: clipforge-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: clipforge-redis
+          property: connectionString
+      - key: STORAGE_ROOT
+        value: /var/data/storage
+      - key: WHISPER_MODEL
+        value: base
+      - key: WHISPER_COMPUTE_TYPE
+        value: int8
+      - key: CPU_THREADS
+        value: "4"
+    disk:
+      name: clipforge-storage
+      mountPath: /var/data/storage
+      sizeGB: 50
+
+  # ─────────────────────────────────────────────────────────────────
+  # Redis – Job Queue & State Coordination
+  # ─────────────────────────────────────────────────────────────────
+  - type: redis
+    name: clipforge-redis
+    region: oregon
+    plan: starter
+    ipAllowList: []
+
+databases:
+  # ─────────────────────────────────────────────────────────────────
+  # Managed PostgreSQL
+  # ─────────────────────────────────────────────────────────────────
+  - name: clipforge-db
+    region: oregon
+    plan: starter
+    databaseName: clipforge
+    user: clipforge
