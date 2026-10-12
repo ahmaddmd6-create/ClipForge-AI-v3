@@ -78,3 +78,5 @@ prompts_text.txt
 report_text.txt
 Dockerfile.clipper
 docker-compose.clipper.yml
+.kilo/
+

@@ -1,114 +1,149 @@
 # ClipForge AI - Production Live Deployment Guide
 
-This guide provides tested paths to deploy ClipForge AI live to production.
+## Architecture: Vercel (Frontend) + Docker (Backend & Worker)
 
----
-
-## Architecture Overview
+This is the recommended production architecture:
+- **Frontend**: Hosted on **Vercel** with global edge CDN caching and zero-config SPA routing.
+- **Backend & Worker**: Hosted via **Docker Compose** on your VPS, server, or cloud VM with FFmpeg, Whisper, PostgreSQL, Redis, and persistent volume storage.
 
 ```
-                      ┌────────────────────────────────────────┐
-                      │    Frontend (Vite / React / Tailwind)  │
-                      │    Hosted on: Vercel / Cloudflare      │
-                      └───────────────────┬────────────────────┘
-                                          │ REST API & WebSockets
-                                          ▼
-                      ┌────────────────────────────────────────┐
-                      │        ClipForge AI Backend API        │
-                      │         (FastAPI on Port 8000)         │
-                      │    Hosted on: Render / Docker / VPS    │
-                      └──────────────┬─────────────┬───────────┘
-                                     │             │
-                    Job Dispatch     │             │ Metadata & State
-                                     ▼             ▼
-  ┌─────────────────────────────────────┐      ┌─────────────────────────┐
-  │     ClipForge Background Worker     │      │   PostgreSQL Database   │
-  │  (yt-dlp, Whisper, FFmpeg, Niche)   │      │   (Jobs, Clips, Assets) │
-  └──────────────────┬──────────────────┘      └─────────────────────────┘
-                     │
-                     ▼
-  ┌─────────────────────────────────────┐
-  │      Redis 7 Persistent Queue       │
-  │     (Job coordination & state)      │
-  └─────────────────────────────────────┘
+┌──────────────────────────────────────────────┐
+│        Frontend (React / Vite / SPA)         │
+│          Hosted Globally on VERCEL           │
+│         https://your-app.vercel.app          │
+└──────────────────────┬───────────────────────┘
+                       │ HTTPS API Requests (VITE_API_BASE_URL)
+                       ▼
+┌──────────────────────────────────────────────┐
+│             Docker Backend Stack             │
+│        (VPS / Cloud Host / Dedicated VM)     │
+│                                              │
+│  ┌────────────────────────────────────────┐  │
+│  │  clipforge-api (FastAPI on Port 8005)  │  │
+│  └──────────────────┬─────────────────────┘  │
+│                     │ Shared DB / Queue / Disk│
+│  ┌──────────────────▼─────────────────────┐  │
+│  │ clipforge-worker (FFmpeg, Whisper CPU) │  │
+│  └──────────────────┬─────────────────────┘  │
+│                     │                        │
+│   ┌─────────────────┴─────────────────┐      │
+│   │ clipforge-db (PostgreSQL 15)      │      │
+│   │ clipforge-redis (Redis 7 Queue)   │      │
+│   │ storage/ (Persistent Render MP4s) │      │
+│   └───────────────────────────────────┘      │
+└──────────────────────────────────────────────┘
 ```
 
 ---
 
-## Strategy A: Vercel (Frontend) + Render (Backend & Worker)
+## Part 1: Run the Backend with Docker
 
-This is the recommended serverless/managed cloud combination.
+### 1. Prerequisites
+Ensure Docker and Docker Compose are installed on your host machine / VPS:
+```bash
+docker --version
+docker compose version
+```
 
-### 1. Backend on Render.com
-Render natively supports Python workers, managed PostgreSQL, Redis, and persistent disks using the included `render.yaml` blueprint.
-
-1. Go to [Render Dashboard](https://dashboard.render.com).
-2. Click **New +** → **Blueprint**.
-3. Connect your GitHub repository: `https://github.com/ahmaddmd6-create/ClipForge-AI-v3`.
-4. Render will detect `render.yaml` and configure:
-   - `clipforge-api`: FastAPI Web Service.
-   - `clipforge-worker`: Background worker with FFmpeg and Whisper.
-   - `clipforge-db`: Managed PostgreSQL database.
-   - `clipforge-redis`: Managed Redis instance.
-5. In the Render Dashboard, set your environment variables:
-   - `OPENAI_API_KEY`: *(Optional)* If using OpenAI GPT-4o / Whisper API.
-   - `ANTHROPIC_API_KEY`: *(Optional)* If using Claude for niche analysis.
-6. Click **Apply**. Once deployed, copy your API URL (e.g., `https://clipforge-api.onrender.com`).
-
-### 2. Frontend on Vercel
-1. Go to [Vercel Dashboard](https://vercel.com/new).
-2. Import the GitHub repository: `ClipForge-AI`.
-3. Set the **Root Directory** to `frontend`.
-4. Add the Environment Variable:
-   - `VITE_API_BASE_URL`: `https://clipforge-api.onrender.com/api`
-5. Click **Deploy**. Vercel will build and publish your SPA globally with CDN edge caching.
-
----
-
-## Strategy B: Cloudflare Pages (Frontend) + Docker (Backend via Cloudflare Tunnel)
-
-Ideal for cost-free frontend edge hosting and hosting your compute-heavy video rendering on your own server or GPU VPS.
-
-### 1. Frontend on Cloudflare Pages
-1. Go to the [Cloudflare Dashboard](https://dash.cloudflare.com) → **Workers & Pages** → **Create application** → **Pages**.
-2. Connect your GitHub repo (`ClipForge-AI`).
-3. Build Settings:
-   - **Root directory**: `frontend`
-   - **Framework preset**: `Vite`
-   - **Build command**: `npm run build`
-   - **Build output directory**: `dist`
-4. Environment Variables:
-   - `VITE_API_BASE_URL`: `https://api.yourdomain.com/api` (or your Cloudflare Tunnel URL).
-5. Click **Save and Deploy**.
-
-### 2. Backend & Worker via Docker + Cloudflare Tunnel
-1. On your VPS or host machine, clone the repository:
-   ```bash
-   git clone https://github.com/ahmaddmd6-create/ClipForge-AI-v3.git
-   cd ClipForge-AI
-   cp .env.example .env
-   ```
-2. Launch the full production stack:
-   ```bash
-   docker compose up -d --build
-   ```
-3. Expose the API publicly through Cloudflare Tunnel (no port forwarding or public IP required):
-   ```bash
-   # Install cloudflared
-   cloudflared tunnel --url http://localhost:8080
-   ```
-4. Copy the generated `https://xxxx.trycloudflare.com` URL and set it as `VITE_API_BASE_URL` on Cloudflare Pages.
-
----
-
-## Strategy C: Complete Single-Host Docker Deployment
-
-For self-hosting on AWS EC2, DigitalOcean Droplet, Hetzner, or Linode:
-
+### 2. Configure Environment (`.env`)
+Clone the repository and copy the environment configuration:
 ```bash
 git clone https://github.com/ahmaddmd6-create/ClipForge-AI-v3.git
-cd ClipForge-AI
+cd ClipForge-AI-v3
 cp .env.example .env
-docker compose up -d
 ```
-All services (Frontend Nginx on port 8080, FastAPI on port 8000, Worker, PostgreSQL, Redis) start automatically with health checks and restart policies.
+Key production variables in `.env`:
+- `APP_ENV=production`
+- `API_PORT=8005` (exposed host port)
+- `CORS_ALLOWED_ORIGINS=https://*.vercel.app,https://your-custom-domain.com`
+- `POSTGRES_PASSWORD=your_strong_postgres_password`
+
+### 3. Launch the Complete Docker Stack
+Start the FastAPI backend, background worker, PostgreSQL, and Redis:
+```bash
+docker compose up -d --build
+```
+
+Verify all services are healthy and running:
+```bash
+docker compose ps
+```
+You should see:
+- `clipforge-api` (Port 8005 -> 8000)
+- `clipforge-worker`
+- `clipforge-db` (healthy)
+- `clipforge-redis` (healthy)
+
+Test backend health locally:
+```bash
+curl http://localhost:8005/api/health
+# Returns: {"status":"healthy","service":"ClipForge AI API"}
+```
+
+---
+
+## Part 2: Expose the Docker Backend Live
+
+To allow your Vercel frontend to reach your Docker backend over HTTPS, choose one of the following methods:
+
+### Option A: Free Instant Cloudflare Tunnel (Zero Port-Forwarding)
+Cloudflare Tunnel gives you an instant, secure `https://` domain for your local or VPS Docker backend without configuring SSL or opening router ports:
+
+1. Download and run `cloudflared`:
+   ```bash
+   cloudflared tunnel --url http://localhost:8005
+   ```
+2. Cloudflare will output an active HTTPS URL:
+   ```text
+   https://xxxx-xxxx-xxxx.trycloudflare.com
+   ```
+3. Use this URL as your `VITE_API_BASE_URL` on Vercel!
+
+*(For permanent domains, you can configure a named tunnel in Cloudflare Zero Trust mapped to `api.yourdomain.com`).*
+
+### Option B: Cloud VPS with Reverse Proxy (Nginx / Caddy + Let's Encrypt)
+On an Ubuntu VPS (DigitalOcean, AWS EC2, Hetzner, Linode):
+1. Point your DNS `api.yourdomain.com` (A Record) to your VPS IP address.
+2. Install Caddy or Nginx:
+   ```bash
+   # Caddy (automatic SSL):
+   # In /etc/caddy/Caddyfile:
+   api.yourdomain.com {
+       reverse_proxy localhost:8005
+   }
+   ```
+3. Reload Caddy: `sudo systemctl reload caddy`.
+
+---
+
+## Part 3: Deploy the Frontend to Vercel
+
+1. Go to the [Vercel Dashboard](https://vercel.com/new).
+2. Connect your GitHub account and import `https://github.com/ahmaddmd6-create/ClipForge-AI-v3`.
+3. Configure the project settings:
+   - **Framework Preset**: `Vite`
+   - **Root Directory**: `frontend`
+   - **Build Command**: `npm run build`
+   - **Output Directory**: `dist`
+4. Add the Environment Variable:
+   - **Name**: `VITE_API_BASE_URL`
+   - **Value**: `https://your-backend-live-url.com` *(e.g. your Cloudflare tunnel or VPS domain)*
+5. Click **Deploy**.
+
+Vercel will build your application and provide your live frontend URL (e.g., `https://clipforge-ai-v3.vercel.app`).
+
+---
+
+## Part 4: Verification & Smoke Test
+
+1. Open your live Vercel URL in your browser.
+2. Verify the status badge in the header shows **"Systems Online"**.
+3. Create a new job:
+   - Paste a YouTube URL or upload a video file.
+   - Click **Generate Clips**.
+4. Monitor the processing stages:
+   - `queued` → `analyzing` (Whisper transcription) → `clipping` (Niche highlight selection) → `rendering` (FFmpeg vertical 9:16 + captions) → `completed`.
+5. Check your generated clips:
+   - Preview with synchronized captions in the browser.
+   - Click **Download MP4** or download subtitle files (SRT/VTT).
+   - All files are persistently saved in `./storage/outputs/<job_id>/` on your Docker host.

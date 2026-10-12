@@ -1,9 +1,12 @@
 import type { Job, ClipDetail, StorageStats } from '../types';
 
-// In production (Vercel), VITE_API_BASE_URL points to your Render backend.
-// In local dev, empty string uses Vite's proxy (/api → localhost:8005).
-const BACKEND = (import.meta.env.VITE_API_BASE_URL as string) || '';
-const API_BASE = `${BACKEND}/api`;
+// In production (Vercel), VITE_API_BASE_URL points to your live Docker backend or tunnel URL.
+// Example: https://api.yourdomain.com or https://xxxx.trycloudflare.com
+// In local dev without env var, empty string falls back to relative /api for proxying.
+const rawBackend = ((import.meta.env.VITE_API_BASE_URL as string) || '').trim().replace(/\/+$/, '');
+const API_BASE = rawBackend
+  ? (rawBackend.endsWith('/api') ? rawBackend : `${rawBackend}/api`)
+  : '/api';
 
 async function handleResponse<T>(res: Response): Promise<T> {
   if (!res.ok) {
